@@ -1,6 +1,7 @@
+// E:\scribble_frontend\src\app\play\page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { socket } from "../../../client/socket";
 import CanvasDraw from "../../../components/CanvasDraw";
 import { Player } from "../../../types/player";
@@ -8,6 +9,7 @@ import { Player } from "../../../types/player";
 interface ChatMessage {
   name: string;
   message: string;
+  isCorrect?: boolean;
 }
 
 export default function Play() {
@@ -15,6 +17,14 @@ export default function Play() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [playerInfo, setPlayerInfo] = useState<Player | null>(null);
+  const [wordToBeChoosen, setWordToBeChoosen] = useState<string[] | null>(null);
+  const [gameWord, setGameWord] = useState<string | null>(null);
+  const gameWordRef = useRef<string | null>(null);
+
+  const [drawer, setDrawer] = useState<{
+    name: string;
+    socketId: string;
+  } | null>(null);
 
   useEffect(() => {
     console.log("play page -->", socket.id);
@@ -36,12 +46,32 @@ export default function Play() {
     };
 
     const handleChat = (msg: ChatMessage) => {
+      console.log("Current game word:", gameWordRef.current);
+
+      if (gameWordRef.current && msg.name !== drawer?.name) {
+        const normalizedMsg = msg.message.trim().toLowerCase();
+        const normalizedGameWord = gameWordRef.current.trim().toLowerCase();
+
+        msg.isCorrect = normalizedMsg === normalizedGameWord;
+      }
+
       setChatMessages((prev) => [...prev, msg]);
     };
 
     socket.on("res_join_room_req", handleJoin);
     socket.on("player_left", handleLeave);
     socket.on("chat_message", handleChat);
+    socket.on("choose_word", ({ words }) => {
+      setWordToBeChoosen(words);
+    });
+    socket.on("game_ready", ({ drawer, sockeId }) => {
+      setDrawer({ name: drawer, socketId: sockeId });
+    });
+
+    socket.on("round_started", (word: { word: string }) => {
+      setGameWord(word.word);
+      gameWordRef.current = word.word;
+    });
 
     return () => {
       socket.off("res_join_room_req", handleJoin);
@@ -65,7 +95,37 @@ export default function Play() {
 
   return (
     <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100 text-black">
+      {drawer && (
+        <>
+          <h1>{drawer.name} is choosing a word to draw </h1>
+          {/* <h1>{drawer.socketId}</h1> */}
+        </>
+      )}
       <h1 className="text-2xl font-bold mb-4">Scribble Room</h1>
+      {wordToBeChoosen && drawer?.socketId === socket.id && (
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold mb-2">Choose a word:</h2>
+          <div className="flex gap-2 flex-wrap">
+            {wordToBeChoosen.map((word, idx) => (
+              <button
+                key={idx}
+                className="bg-yellow-300 hover:bg-yellow-400 px-4 py-2 rounded shadow"
+                onClick={() => {
+                  if (playerInfo) {
+                    socket.emit("word_chosen", {
+                      word,
+                      roomNo: playerInfo.roomNo,
+                    });
+                    setWordToBeChoosen(null); // Hide words after choosing
+                  }
+                }}
+              >
+                {word}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Player Info */}
       {playerInfo && (
@@ -74,7 +134,6 @@ export default function Play() {
           <h3 className="text-md text-gray-600">Room: {playerInfo.roomNo}</h3>
         </div>
       )}
-
       {/* Join/Leave System Messages */}
       <div className="w-full max-w-xl mb-4 space-y-2">
         {messages.map((msg, index) => (
@@ -86,35 +145,50 @@ export default function Play() {
           </div>
         ))}
       </div>
-
       {/* Chat Box */}
       <div className="w-full max-w-xl mb-4">
         <div className="h-40 overflow-y-auto bg-white p-3 rounded shadow-sm border border-gray-300 mb-2">
           {chatMessages.map((msg, index) => (
             <div key={index} className="text-sm text-gray-800">
-              <span className="font-semibold">{msg.name}:</span> {msg.message}
+              {msg.isCorrect === true && (
+                <span className="text-green-600 font-bold ml-2">✅</span>
+              )}
+              {msg.isCorrect === false && (
+                <span className="text-red-500 font-bold ml-2">
+                  {" "}
+                  <span className="font-semibold">{msg.name}:</span>{" "}
+                  {msg.message}❌
+                </span>
+              )}
             </div>
           ))}
         </div>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
-            placeholder="Type a message..."
-            className="flex-grow p-2 border rounded"
-          />
-          <button
-            onClick={sendChatMessage}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Send
-          </button>
-        </div>
+        {drawer?.socketId == socket.id ? (
+          <></>
+        ) : (
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+              placeholder="Type a message..."
+              className="flex-grow p-2 border rounded"
+            />
+            <button
+              onClick={sendChatMessage}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Send
+            </button>
+          </div>
+        )}
       </div>
-
-      <CanvasDraw playerInfo={playerInfo} socket={socket}></CanvasDraw>
+      <CanvasDraw
+        playerInfo={playerInfo}
+        socket={socket}
+        drawer={drawer}
+      ></CanvasDraw>
     </div>
   );
 }

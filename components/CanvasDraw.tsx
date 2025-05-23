@@ -6,11 +6,21 @@ import { Player } from "../types/player";
 interface CanvasDrawProps {
   socket: Socket;
   playerInfo: Player | null;
+  drawer: {
+    name: string;
+    socketId: string;
+  } | null;
 }
-export default function CanvasDraw({ socket, playerInfo }: CanvasDrawProps) {
+
+export default function CanvasDraw({
+  socket,
+  playerInfo,
+  drawer,
+}: CanvasDrawProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
+  const [lastPos, setLastPos] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,9 +59,8 @@ export default function CanvasDraw({ socket, playerInfo }: CanvasDrawProps) {
     };
   };
 
-  const [lastPos, setLastPos] = useState<{ x: number; y: number } | null>(null);
-
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (drawer?.socketId !== socket.id) return; // ❌ Not the drawer, can't draw
     const canvas = canvasRef.current;
     if (!canvas || !ctx) return;
     const { x, y } = getPosition(e, canvas);
@@ -60,7 +69,9 @@ export default function CanvasDraw({ socket, playerInfo }: CanvasDrawProps) {
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (drawer?.socketId !== socket.id) return; // ❌ Not the drawer
     if (!isDrawing || !ctx || !lastPos) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -85,6 +96,7 @@ export default function CanvasDraw({ socket, playerInfo }: CanvasDrawProps) {
   };
 
   const stopDrawing = () => {
+    if (drawer?.socketId !== socket.id) return; // ❌ Not the drawer
     setIsDrawing(false);
     setLastPos(null);
   };
