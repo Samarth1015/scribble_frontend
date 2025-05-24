@@ -19,6 +19,9 @@ export default function Play() {
   const [playerInfo, setPlayerInfo] = useState<Player | null>(null);
   const [wordToBeChoosen, setWordToBeChoosen] = useState<string[] | null>(null);
   const [gameWord, setGameWord] = useState<string | null>(null);
+  const [playerPoints, setPlayerPoints] = useState<Map<string, number>>(
+    new Map()
+  );
   const gameWordRef = useRef<string | null>(null);
 
   const [drawer, setDrawer] = useState<{
@@ -58,6 +61,25 @@ export default function Play() {
       setChatMessages((prev) => [...prev, msg]);
     };
 
+    socket.on("game_over", (data: { points: { [key: string]: number } }) => {
+      console.log("game over", data.points);
+      setPlayerPoints(new Map(Object.entries(data.points)));
+      // Reset all game state
+      setWordToBeChoosen(null);
+      setGameWord(null);
+      gameWordRef.current = null;
+      setDrawer(null);
+      setChatMessages([]);
+      setMessages((prev) => [...prev, "Game Over! Starting new game..."]);
+    });
+
+    socket.on(
+      "points_update",
+      (data: { points: { [key: string]: number } }) => {
+        setPlayerPoints(new Map(Object.entries(data.points)));
+      }
+    );
+
     socket.on("res_join_room_req", handleJoin);
     socket.on("player_left", handleLeave);
     socket.on("chat_message", handleChat);
@@ -81,20 +103,48 @@ export default function Play() {
   }, []);
 
   const sendChatMessage = () => {
+    let chatMsg: ChatMessage & { roomNo: number };
     if (!chatInput.trim() || !playerInfo) return;
-
-    const chatMsg: ChatMessage & { roomNo: number } = {
-      name: playerInfo.name,
-      message: chatInput.trim(),
-      roomNo: playerInfo.roomNo,
-    };
-
+    if (chatInput.trim() === gameWordRef.current?.trim()) {
+      chatMsg = {
+        name: playerInfo.name,
+        message: chatInput.trim(),
+        roomNo: playerInfo.roomNo,
+        isCorrect: true,
+      };
+    } else {
+      chatMsg = {
+        name: playerInfo.name,
+        message: chatInput.trim(),
+        roomNo: playerInfo.roomNo,
+        isCorrect: false,
+      };
+    }
     socket.emit("chat_message", chatMsg);
+
     setChatInput("");
   };
 
   return (
     <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100 text-black">
+      {/* Points Display */}
+      <div className="w-full max-w-xl mb-4">
+        <h2 className="text-lg font-semibold mb-2">Points:</h2>
+        <div className="bg-white p-3 rounded shadow-sm border border-gray-300">
+          {Array.from(playerPoints.entries()).map(([socketId, points]) => (
+            <div
+              key={socketId}
+              className="flex justify-between items-center py-1"
+            >
+              <span className="font-medium">
+                {socketId === playerInfo?.socketId ? "You" : "Player"}
+              </span>
+              <span className="text-blue-600 font-bold">{points}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {drawer && (
         <>
           <h1>{drawer.name} is choosing a word to draw </h1>
@@ -151,7 +201,10 @@ export default function Play() {
           {chatMessages.map((msg, index) => (
             <div key={index} className="text-sm text-gray-800">
               {msg.isCorrect === true && (
-                <span className="text-green-600 font-bold ml-2">✅</span>
+                <span className="text-green-600 font-bold ml-2">
+                  {" "}
+                  <span className="font-semibold">{msg.name}:</span> ✅
+                </span>
               )}
               {msg.isCorrect === false && (
                 <span className="text-red-500 font-bold ml-2">
