@@ -24,7 +24,11 @@ export default function Home() {
         <h1 className="text-4xl font-bold text-center mb-8 text-blue-600">
           Scribbl.io
         </h1>
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> e8a70b761a388a5c2896ca5a78c164ae8ae416a7
         <div className="space-y-6">
           <div className="relative">
             <input

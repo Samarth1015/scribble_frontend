@@ -88,9 +88,6 @@ export default function CanvasDraw({
 
     const { x, y } = getPosition(e, canvas);
 
-    ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = isEraser ? "#FFFFFF" : strokeColor;
-
     // Draw locally
     ctx.beginPath();
     ctx.moveTo(lastPos.x, lastPos.y);
@@ -118,65 +115,21 @@ export default function CanvasDraw({
     setLastPos(null);
   };
 
-  const clearCanvas = () => {
-    if (drawer?.socketId !== socket.id) return;
-    if (!ctx || !canvasRef.current) return;
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-    socket.emit("clear_canvas", { roomNo: playerInfo?.roomNo });
-  };
-
   return (
-    <div className="flex flex-col items-center">
-      {drawer?.socketId === socket.id && (
-        <div className="mb-4 flex items-center gap-4 bg-white p-4 rounded-lg shadow">
-          <input
-            type="color"
-            value={strokeColor}
-            onChange={(e) => setStrokeColor(e.target.value)}
-            className="w-10 h-10 cursor-pointer"
-          />
-          <input
-            type="range"
-            min="1"
-            max="20"
-            value={strokeWidth}
-            onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-            className="w-32"
-          />
-          <button
-            onClick={() => setIsEraser(!isEraser)}
-            className={`px-4 py-2 rounded ${
-              isEraser ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
-            }`}
-          >
-            Eraser
-          </button>
-          <button
-            onClick={clearCanvas}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            Clear All
-          </button>
-        </div>
-      )}
-      <canvas
-        ref={canvasRef}
-        style={{
-          border: "2px solid #ccc",
-          background: "#fff",
-          borderRadius: "8px",
-        }}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{
+        border: "2px solid #ccc",
+        marginTop: "1rem",
+        background: "#fff",
+      }}
+      onMouseDown={startDrawing}
+      onMouseMove={draw}
+      onMouseUp={stopDrawing}
+      onMouseLeave={stopDrawing}
+      onTouchStart={startDrawing}
+      onTouchMove={draw}
+      onTouchEnd={stopDrawing}
+    />
   );
 }
